@@ -15,6 +15,7 @@ struct SettingsView: View {
                     PersonaSettingsSection(viewModel: personaVM) {
                         startCycle()
                     }
+                    LocaleSettingsSection()
                     cookiesSection
                     privacyResetSection
                     aboutSection

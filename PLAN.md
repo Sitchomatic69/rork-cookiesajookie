@@ -53,6 +53,12 @@
    - `Views/PersonaSettingsSection.swift`, `Views/CycleOverlayView.swift`
    - Refactor `BrowserView` / `IdentityService` to read everything from `ProfileManager` (the old `IdentitySettings` becomes a thin adapter).
 
+8. **Custom locale override** (added) — user-chosen language + timezone layered on top of the active persona:
+   - `Models/LocaleOverride.swift` (mode/override + `BrowsingPersona.applyingLocale` + `LocaleVault`), `Models/LocaleCatalog.swift` (language/timezone catalog).
+   - `ViewModels/LocaleSettingsViewModel.swift`; `Views/LocaleSettingsView.swift`, `Views/LocaleSettingsSection.swift`, `Views/LocaleListPicker.swift` (searchable picker).
+   - `ProfileManager` now holds `basePersona` + `localeOverride` and vends an effective `activePersona`; the override persists in `UserDefaults` and **survives cycles** (a person keeps their locale across devices). `.auto` defers to the persona's built-in en-US/Pacific locale.
+   - Flows into both the injected `PersonaScript` (navigator.language/languages, Intl timezone) and `PersonaURLSession` / `BrowserRequestFactory` (Accept-Language). Open web views reload on change; "Match This Device" aligns locale with the real region for IP consistency.
+
 ## Deliverable doc
 
 I'll also write `PROFILE_ARCHITECTURE.md` covering:

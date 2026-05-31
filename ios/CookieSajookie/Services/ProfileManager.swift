@@ -19,7 +19,15 @@ final class ProfileManager {
     static let willCycleNotification = Notification.Name("ProfileManager.willCycle")
     /// Posted after cycle persona is sealed but before cold-start (mostly for tests).
     static let didCycleNotification = Notification.Name("ProfileManager.didCycle")
+    /// Posted after the locale override changes so open web views can reload.
+    static let didChangeLocaleNotification = Notification.Name("ProfileManager.didChangeLocale")
 
+    /// The raw device persona picked from the matrix (what cycling replaces).
+    private(set) var basePersona: BrowsingPersona
+    /// User locale preference layered on top of `basePersona`.
+    private(set) var localeOverride: LocaleOverride
+    /// The effective persona every web view + request actually uses
+    /// (`basePersona` with the locale override applied).
     private(set) var activePersona: BrowsingPersona
     private(set) var network: PersonaURLSession
 
@@ -30,8 +38,12 @@ final class ProfileManager {
             PersonaVault.save(fresh)
             return fresh
         }()
-        self.activePersona = initial
-        self.network = PersonaURLSession(persona: initial)
+        let override = LocaleVault.load()
+        let effective = initial.applyingLocale(override)
+        self.basePersona = initial
+        self.localeOverride = override
+        self.activePersona = effective
+        self.network = PersonaURLSession(persona: effective)
     }
 
     // MARK: - WKWebView vending
@@ -66,11 +78,27 @@ final class ProfileManager {
         webView.customUserAgent = activePersona.userAgent
     }
 
+    // MARK: - Locale override
+
+    /// Apply a new locale preference on top of the current device persona.
+    /// Persisted independently so it survives profile cycles.
+    func applyLocaleOverride(_ override: LocaleOverride) {
+        self.localeOverride = override
+        LocaleVault.save(override)
+        let effective = basePersona.applyingLocale(override)
+        self.activePersona = effective
+        self.network.rebuild(for: effective)
+        NotificationCenter.default.post(name: Self.didChangeLocaleNotification, object: nil)
+    }
+
     // MARK: - Persona swap (used by cycle)
 
     func sealNewPersona(_ persona: BrowsingPersona) {
-        self.activePersona = persona
-        self.network.rebuild(for: persona)
+        self.basePersona = persona
+        let effective = persona.applyingLocale(localeOverride)
+        self.activePersona = effective
+        self.network.rebuild(for: effective)
+        // Store the raw device persona; the locale override is vaulted separately.
         PersonaVault.save(persona)
     }
 }

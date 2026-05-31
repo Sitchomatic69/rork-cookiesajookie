@@ -162,6 +162,7 @@ struct BrowserWebView: UIViewRepresentable {
 
         context.coordinator.webView = webView
         context.coordinator.observeProgress()
+        context.coordinator.observeLocaleChanges()
         return webView
     }
 
@@ -199,9 +200,34 @@ struct BrowserWebView: UIViewRepresentable {
         var lastLoadTrigger: Int = -1
         var currentPersona: BrowsingPersona?
         private var progressObservation: NSKeyValueObservation?
+        private var localeObserver: NSObjectProtocol?
 
         init(_ parent: BrowserWebView) {
             self.parent = parent
+        }
+
+        deinit {
+            if let localeObserver {
+                NotificationCenter.default.removeObserver(localeObserver)
+            }
+        }
+
+        /// Reload the current page under the new locale so the change takes
+        /// effect immediately (the persona script only runs at document start).
+        func observeLocaleChanges() {
+            localeObserver = NotificationCenter.default.addObserver(
+                forName: ProfileManager.didChangeLocaleNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    guard let self, let webView = self.webView else { return }
+                    let persona = ProfileManager.shared.activePersona
+                    webView.customUserAgent = persona.userAgent
+                    self.currentPersona = persona
+                    if webView.url != nil { webView.reload() }
+                }
+            }
         }
 
         func observeProgress() {

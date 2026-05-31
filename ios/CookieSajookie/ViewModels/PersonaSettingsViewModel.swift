@@ -9,13 +9,15 @@ final class PersonaSettingsViewModel {
 
     init() {
         self.persona = ProfileManager.shared.activePersona
-        NotificationCenter.default.addObserver(
-            forName: ProfileManager.didCycleNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.persona = ProfileManager.shared.activePersona
+        for name in [ProfileManager.didCycleNotification, ProfileManager.didChangeLocaleNotification] {
+            NotificationCenter.default.addObserver(
+                forName: name,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.persona = ProfileManager.shared.activePersona
+                }
             }
         }
     }
